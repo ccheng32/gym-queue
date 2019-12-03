@@ -6,8 +6,9 @@ from gym import wrappers, logger
 class RandomAgent(object):
     """The world's simplest agent!"""
     def act(self, observation, reward):
-        (n,q) = observation
-        a = random.sample(range(len(q)), n)
+        if len(observation) < 1:
+            return -1
+        a = random.randint(0, len(observation)-1)
         return a
 
 
