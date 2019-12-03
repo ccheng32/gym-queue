@@ -1,45 +1,52 @@
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
-
+from gym.spaces.space import Space
+from gym.spaces.discrete import Discrete
+import numpy as np
 
 class QueueEnv(gym.Env):
   metadata = {'render.modes': ['human']}
 
-  def __init__(self, max_slack=float(1e9), in_rate=4, max_wrongs=3, past_steps=10, seed=None):
+  def __init__(self, max_slack=float(1e9), queue_size=int(1e6), max_wrongs=3, past_steps=10, seed=None):
       # Fixed variables.
       self.max_slack = max_slack
-      self.in_rate = in_rate
       self.past_steps = past_steps
       self.max_wrongs = max_wrongs
       self.seed = seed
+      self.queue_size = queue_size
+      self.init_queue = list()
+      init_slack_rng, _ = seeding.np_random(self.seed)
+      self.observation_space = Space([queue_size], np.dtype(float))
+      self.action_space = Discrete(queue_size)
+      for i in range(self.queue_size):
+          self.init_queue.append(init_slack_rng.random_sample() * self.max_slack)
 
       # Variables that can be reset.
       self.slack_rng, _ = seeding.np_random(self.seed)
-      self.queue = list()
       self.wrong_deques = [0] * self.past_steps
       self.wrong_deque_idx = 0
+      self.queue = list(self.init_queue)
 
   # action is a set of indices. The indices point to the packets that should be removed from the queue
   # in this step.
   def step(self, action):
-      rewards = 0
+      rewards = 0.0
       done = False
 
-      if action >= 0:
-          # First deque packet from queue.
-          deleted_packet = self.queue[action]
-          del self.queue[action]
+      # First deque packet from queue.
+      deleted_packet = self.queue[action]
+      del self.queue[action]
 
-          # Check if the deleted packets matches LSTF policy.
-          self.wrong_deques[self.wrong_deque_idx] = 0
-          if len(self.queue) > 0:
-              min_slack = min(self.queue)
-              if deleted_packet <= min_slack:
-                  rewards += 1
-              else:
-                  self.wrong_deques[self.wrong_deque_idx] += 1
-                  rewards -= 1
+      # Check if the deleted packet matches LSTF policy.
+      self.wrong_deques[self.wrong_deque_idx] = 0
+      if len(self.queue) > 0:
+          min_slack = min(self.queue)
+          if deleted_packet <= min_slack:
+              rewards += 1.0
+          else:
+              self.wrong_deques[self.wrong_deque_idx] += 1
+              rewards -= 1.0
       
       # If there are more than max_wrongs wrong deques in the previous past_steps steps,
       # then we end the episode.
@@ -47,9 +54,8 @@ class QueueEnv(gym.Env):
       if sum(self.wrong_deques) > self.max_wrongs:
           done = True
 
-      # Enque the incoming packets.
-      for i in range(self.in_rate):
-          self.queue.append(self.max_slack * self.slack_rng.random_sample())
+      # Enque one incoming packet.
+      self.queue.append(self.max_slack * self.slack_rng.random_sample())
 
       # Decrement the slacks in the queue.
       for i in range(len(self.queue)):
@@ -65,6 +71,7 @@ class QueueEnv(gym.Env):
       self.queue = list()
       self.wrong_deques = [0] * self.past_steps
       self.wrong_deque_idx = 0
+      self.queue = list(self.init_queue)
       obs = list(self.queue)
       return obs
 
