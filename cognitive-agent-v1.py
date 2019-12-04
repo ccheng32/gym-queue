@@ -11,7 +11,7 @@ import QueueEnv
 from tensorflow import keras
 
 #env = gym.make('ns3-v0')
-env = QueueEnv.QueueEnv()
+env = QueueEnv.QueueEnv(queue_size=10, max_slack=10)
 ob_space = env.observation_space
 ac_space = env.action_space
 print("Observation space: ", ob_space,  ob_space.dtype)
@@ -20,19 +20,19 @@ print("Action space: ", ac_space, ac_space.n)
 s_size = ob_space.shape[0]
 a_size = ac_space.n
 model = keras.Sequential()
-model.add(keras.layers.Dense(s_size, input_shape=(s_size,), activation='relu'))
-model.add(keras.layers.Dense(a_size, activation='softmax'))
+model.add(keras.layers.Dense(100*s_size, input_shape=(s_size,), activation='relu'))
+model.add(keras.layers.Dense(a_size, input_shape=(100*s_size,), activation='softmax'))
 model.compile(optimizer=tf.train.AdamOptimizer(0.001),
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
-total_episodes = 200
+total_episodes = 5000
 max_env_steps = 100
 env._max_episode_steps = max_env_steps
 
 epsilon = 1.0               # exploration rate
 epsilon_min = 0.01
-epsilon_decay = 0.999
+epsilon_decay = 0.9995
 
 time_history = []
 rew_history = []
